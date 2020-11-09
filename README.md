@@ -1,7 +1,7 @@
-Silhouette 
+Silhouette
 ==========
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.mohiva/play-silhouette_2.12/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.mohiva/play-silhouette_2.12) [![Build Status](https://travis-ci.org/mohiva/play-silhouette.png)](https://travis-ci.org/mohiva/play-silhouette) [![Coverage Status](https://coveralls.io/repos/mohiva/play-silhouette/badge.svg?branch=master&service=github)](https://coveralls.io/github/mohiva/play-silhouette?branch=master) [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/mohiva/play-silhouette?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![OpenCollective](https://opencollective.com/silhouette/backers/badge.svg)](#backers) 
+[![OpenCollective](https://opencollective.com/silhouette/backers/badge.svg)](#backers)
 [![OpenCollective](https://opencollective.com/silhouette/sponsors/badge.svg)](#sponsors)
 
 
@@ -18,6 +18,7 @@ If you have question regarding Silhouette, please use the [chat] or the [forum].
 Please read the [contributing guide] before you contribute. It contains very useful tips for a successful contribution.
 
 ## Backers
+test
 
 Support us with a monthly donation and help us continue our activities. [[Become a backer](https://opencollective.com/silhouette#backer)]
 
