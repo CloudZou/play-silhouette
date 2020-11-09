@@ -16,15 +16,14 @@
 package com.mohiva.play.silhouette.impl.authenticators
 
 import com.atlassian.jwt.SigningAlgorithm
-import com.atlassian.jwt.core.writer.{ JsonSmartJwtJsonBuilder, NimbusJwtWriterFactory }
+import com.atlassian.jwt.core.writer.{JsonSmartJwtJsonBuilder, NimbusJwtWriterFactory}
 import com.mohiva.play.silhouette.api.Authenticator.Implicits._
 import com.mohiva.play.silhouette.api.crypto.AuthenticatorEncoder
 import com.mohiva.play.silhouette.api.exceptions._
-import com.mohiva.play.silhouette.api.repositories.AuthenticatorRepository
 import com.mohiva.play.silhouette.api.services.AuthenticatorService._
-import com.mohiva.play.silhouette.api.services.{ AuthenticatorResult, AuthenticatorService }
+import com.mohiva.play.silhouette.api.services.{AuthenticatorResult, AuthenticatorService}
 import com.mohiva.play.silhouette.api.util._
-import com.mohiva.play.silhouette.api.{ ExpirableAuthenticator, Logger, LoginInfo, StorableAuthenticator }
+import com.mohiva.play.silhouette.api.{ExpirableAuthenticator, Logger, LoginInfo, StorableAuthenticator}
 import com.mohiva.play.silhouette.impl.authenticators.JWTAuthenticator._
 import com.mohiva.play.silhouette.impl.authenticators.JWTAuthenticatorService._
 import com.nimbusds.jose.JWSObject
@@ -32,12 +31,13 @@ import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jwt.JWTClaimsSet
 import org.joda.time.DateTime
 import play.api.libs.json._
-import play.api.mvc.{ RequestHeader, Result }
-
+import play.api.mvc.{RequestHeader, Result}
 import com.mohiva.play.silhouette.ScalaCompat.JavaConverters._
+import com.mohiva.play.silhouette.api.repositories.Authenticator.AuthenticatorRepository
+
 import scala.concurrent.duration._
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.{ Failure, Success, Try }
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 /**
  * An authenticator that uses a header based approach with the help of a JWT. It works by

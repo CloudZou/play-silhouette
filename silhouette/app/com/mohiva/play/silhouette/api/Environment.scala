@@ -15,7 +15,8 @@
  */
 package com.mohiva.play.silhouette.api
 
-import com.mohiva.play.silhouette.api.services.{ AuthenticatorService, IdentityService }
+import com.mohiva.play.silhouette.api.services.AuthenticatorService
+import com.mohiva.play.silhouette.api.services.Identity.IdentityService
 import com.mohiva.play.silhouette.api.util.ExecutionContextProvider
 
 import scala.concurrent.ExecutionContext
@@ -55,7 +56,7 @@ trait Env {
  * defined in the environment type. But the [[EventBus]] and the list of [[RequestProvider]]
  * instances can be defined as needed for every environment type.
  */
-trait Environment[E <: Env] extends ExecutionContextProvider {
+trait Environment[E <: Env] {
 
   /**
    * Gets the identity service implementation.
@@ -99,11 +100,10 @@ object Environment {
     identityServiceImpl: IdentityService[E#I],
     authenticatorServiceImpl: AuthenticatorService[E#A],
     requestProvidersImpl: Seq[RequestProvider],
-    eventBusImpl: EventBus)(implicit ec: ExecutionContext) = new Environment[E] {
+    eventBusImpl: EventBus) = new Environment[E] {
     val identityService = identityServiceImpl
     val authenticatorService = authenticatorServiceImpl
     val requestProviders = requestProvidersImpl
     val eventBus = eventBusImpl
-    val executionContext = ec
   }
 }

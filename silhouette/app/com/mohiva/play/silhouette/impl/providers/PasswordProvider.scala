@@ -15,7 +15,6 @@
  */
 package com.mohiva.play.silhouette.impl.providers
 
-import com.mohiva.play.silhouette.api.repositories.AuthInfoRepository
 import com.mohiva.play.silhouette.api.util.{ ExecutionContextProvider, PasswordHasherRegistry, PasswordInfo }
 import com.mohiva.play.silhouette.api.{ LoginInfo, Provider }
 import com.mohiva.play.silhouette.impl.providers.PasswordProvider._

@@ -19,12 +19,9 @@
  */
 package com.mohiva.play.silhouette.api.services
 
-import com.mohiva.play.silhouette.api.util.{ ExtractableRequest, ExecutionContextProvider }
-import com.mohiva.play.silhouette.api.{ Authenticator, LoginInfo }
-import play.api.http.HttpEntity
-import play.api.mvc._
-
-import scala.concurrent.Future
+import com.mohiva.play.silhouette.api.auth.Result
+import com.mohiva.play.silhouette.api.{Authenticator, LoginInfo}
+import zio.Task
 
 /**
  * A marker result which indicates that an operation on an authenticator was processed and
@@ -44,27 +41,7 @@ import scala.concurrent.Future
  * @param result The result to wrap.
  */
 class AuthenticatorResult(result: Result)
-  extends Result(result.header, result.body, result.newSession, result.newFlash, result.newCookies) {
-
-  /**
-   * Creates a new copy of a `AuthenticatorResult`.
-   *
-   * @param header     The response header, which contains status code and HTTP headers.
-   * @param body       The response body.
-   * @param newSession A new session.
-   * @param newFlash   A new flash.
-   * @param newCookies Some new cookies.
-   * @return A copy of a `AuthenticatorResult`.
-   */
-  override def copy(
-    header: ResponseHeader,
-    body: HttpEntity,
-    newSession: Option[Session],
-    newFlash: Option[Flash],
-    newCookies: Seq[Cookie]
-  ) = {
-    AuthenticatorResult(super.copy(header, body, newSession, newFlash, newCookies))
-  }
+  extends Result{
 }
 
 /**
@@ -86,45 +63,41 @@ object AuthenticatorResult {
  *
  * @tparam T The type of the authenticator this service is responsible for.
  */
-trait AuthenticatorService[T <: Authenticator] extends ExecutionContextProvider {
+trait AuthenticatorService[T <: Authenticator] {
 
   /**
    * Creates a new authenticator for the specified login info.
    *
    * @param loginInfo The login info for which the authenticator should be created.
-   * @param request The request header.
    * @return An authenticator.
    */
-  def create(loginInfo: LoginInfo)(implicit request: RequestHeader): Future[T]
+  def create(loginInfo: LoginInfo): Task[T]
 
   /**
    * Retrieves the authenticator from request.
    *
-   * @param request The request to retrieve the authenticator from.
    * @tparam B The type of the request body.
    * @return Some authenticator or None if no authenticator could be found in request.
    */
-  def retrieve[B](implicit request: ExtractableRequest[B]): Future[Option[T]]
+  def retrieve[B]: Task[Option[T]]
 
   /**
    * Initializes an authenticator and instead of embedding into the the request or result, it returns
    * the serialized value.
    *
    * @param authenticator The authenticator instance.
-   * @param request The request header.
    * @return The serialized authenticator value.
    */
-  def init(authenticator: T)(implicit request: RequestHeader): Future[T#Value]
+  def init(authenticator: T): Task[T#Value]
 
   /**
    * Embeds authenticator specific artifacts into the response.
    *
    * @param value The authenticator value to embed.
    * @param result The result to manipulate.
-   * @param request The request header.
    * @return The manipulated result.
    */
-  def embed(value: T#Value, result: Result)(implicit request: RequestHeader): Future[AuthenticatorResult]
+  def embed(value: T#Value, result: Result): Task[AuthenticatorResult]
 
   /**
    * Embeds authenticator specific artifacts into the request.
@@ -166,10 +139,9 @@ trait AuthenticatorService[T <: Authenticator] extends ExecutionContextProvider 
    *
    * @param authenticator The authenticator to update.
    * @param result The result to manipulate.
-   * @param request The request header.
    * @return The original or a manipulated result.
    */
-  def update(authenticator: T, result: Result)(implicit request: RequestHeader): Future[AuthenticatorResult]
+  def update(authenticator: T, result: Result): Task[AuthenticatorResult]
 
   /**
    * Renews the expiration of an authenticator without embedding it into the result.
@@ -178,10 +150,9 @@ trait AuthenticatorService[T <: Authenticator] extends ExecutionContextProvider 
    * creating a new one. If the authenticator was updated, then the updated artifacts should be returned.
    *
    * @param authenticator The authenticator to renew.
-   * @param request The request header.
    * @return The serialized expression of the authenticator.
    */
-  def renew(authenticator: T)(implicit request: RequestHeader): Future[T#Value]
+  def renew(authenticator: T): Task[T#Value]
 
   /**
    * Renews the expiration of an authenticator.
@@ -192,20 +163,18 @@ trait AuthenticatorService[T <: Authenticator] extends ExecutionContextProvider 
    *
    * @param authenticator The authenticator to renew.
    * @param result The result to manipulate.
-   * @param request The request header.
    * @return The original or a manipulated result.
    */
-  def renew(authenticator: T, result: Result)(implicit request: RequestHeader): Future[AuthenticatorResult]
+  def renew(authenticator: T, result: Result): Task[AuthenticatorResult]
 
   /**
    * Manipulates the response and removes authenticator specific artifacts before sending it to the client.
    *
    * @param authenticator The authenticator instance.
    * @param result The result to manipulate.
-   * @param request The request header.
    * @return The manipulated result.
    */
-  def discard(authenticator: T, result: Result)(implicit request: RequestHeader): Future[AuthenticatorResult]
+  def discard(authenticator: T, result: Result): Task[AuthenticatorResult]
 }
 
 /**
