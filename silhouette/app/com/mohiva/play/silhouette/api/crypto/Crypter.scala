@@ -15,30 +15,99 @@
  */
 package com.mohiva.play.silhouette.api.crypto
 
-/**
- * Crypter interface.
- *
- * This trait provides a generic encryption/decryption interface for the core, for which a concrete
- * implementation can be provided in userland.
- *
- * It's not guaranteed that the concrete implementations are compatible to each other. This means that
- * they cannot act as drop-in replacements.
- */
-trait Crypter {
+import java.security.MessageDigest
+import java.util.Base64
 
-  /**
-   * Encrypts a string.
-   *
-   * @param value The plain text to encrypt.
-   * @return The encrypted string.
-   */
-  def encrypt(value: String): String
+import com.mohiva.play.silhouette.api.exceptions.CryptoException
+import javax.crypto.Cipher
+import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
+import zio.{Has, Layer, Task, ZLayer}
 
-  /**
-   * Decrypts a string.
-   *
-   * @param value The value to decrypt.
-   * @return The plain text string.
-   */
-  def decrypt(value: String): String
+object Crypter {
+  type Crypter = Has[Service]
+
+  trait Service {
+    /**
+     * Encrypts a string.
+     *
+     * @param value The plain text to encrypt.
+     * @return The encrypted string.
+     */
+    def encrypt(key: String, value: String): Task[String]
+
+    /**
+     * Decrypts a string.
+     *
+     * @param value The value to decrypt.
+     * @return The plain text string.
+     */
+    def decrypt(key: String, value: String): Task[String]
+  }
+
+  val UnderlyingIVBug = "[Silhouette][JcaCrypter] Cannot get IV! There must be a bug in your underlying JCE " +
+    "implementation; The AES/CTR/NoPadding transformation should always provide an IV"
+  val UnexpectedFormat = "[Silhouette][JcaCrypter] Unexpected format; expected [VERSION]-[ENCRYPTED STRING]"
+  val UnknownVersion = "[Silhouette][JcaCrypter] Unknown version: %s"
+
+  val live: Layer[Nothing, Has[Service]] = ZLayer.succeed {
+    new Service {
+      /**
+       * Encrypts a string.
+       *
+       * @param value The plain text to encrypt.
+       * @return The encrypted string.
+       */
+      override def encrypt(key: String,  value: String): Task[String] = Task.fromFunctionM { _ =>
+        val keySpec = secretKeyWithSha256(key, "AES")
+        val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, keySpec)
+        val encryptedValue = cipher.doFinal(value.getBytes("UTF-8"))
+        val version = 1
+        Option(cipher.getIV) match {
+          case Some(iv) => Task.succeed(s"$version-${Base64.getEncoder.encodeToString(iv ++ encryptedValue)}")
+          case None     => Task.fail(new CryptoException(UnderlyingIVBug))
+        }
+      }
+
+      /**
+       * Decrypts a string.
+       *
+       * @param value The value to decrypt.
+       * @return The plain text string.
+       */
+      override def decrypt(key: String,  value: String): Task[String] = Task.succeed {
+        value.split("-", 2) match {
+          case Array(version, data) if version == "1" => decryptVersion1(data, key)
+          case Array(version, _)                      => throw new CryptoException(UnknownVersion.format(version))
+          case v                                      => throw new CryptoException(UnexpectedFormat)
+        }
+      }
+
+      /**
+       * Generates the SecretKeySpec, given the private key and the algorithm.
+       */
+      private def secretKeyWithSha256(privateKey: String, algorithm: String) = {
+        val messageDigest = MessageDigest.getInstance("SHA-256")
+        messageDigest.update(privateKey.getBytes("UTF-8"))
+        // max allowed length in bits / (8 bits to a byte)
+        val maxAllowedKeyLength = Cipher.getMaxAllowedKeyLength(algorithm) / 8
+        val raw = messageDigest.digest().slice(0, maxAllowedKeyLength)
+        new SecretKeySpec(raw, algorithm)
+      }
+
+      /**
+       * V1 decryption algorithm (AES/CTR/NoPadding - IV present).
+       */
+      private def decryptVersion1(value: String, privateKey: String): String = {
+        val data = Base64.getDecoder.decode(value)
+        val keySpec = secretKeyWithSha256(privateKey, "AES")
+        val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+        val blockSize = cipher.getBlockSize
+        val iv = data.slice(0, blockSize)
+        val payload = data.slice(blockSize, data.size)
+        cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(iv))
+        new String(cipher.doFinal(payload), "UTF-8")
+      }
+    }
+  }
 }

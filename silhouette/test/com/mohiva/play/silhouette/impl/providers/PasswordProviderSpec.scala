@@ -15,7 +15,6 @@
  */
 package com.mohiva.play.silhouette.impl.providers
 
-import com.mohiva.play.silhouette.api.repositories.AuthInfoRepository
 import com.mohiva.play.silhouette.api.util._
 import org.specs2.mock.Mockito
 import org.specs2.specification.Scope

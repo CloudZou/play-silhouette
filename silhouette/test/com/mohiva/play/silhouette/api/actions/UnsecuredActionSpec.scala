@@ -22,7 +22,7 @@ import akka.testkit.TestProbe
 import com.mohiva.play.silhouette.api._
 import com.mohiva.play.silhouette.api.actions.UnsecuredActionSpec._
 import com.mohiva.play.silhouette.api.exceptions.NotAuthorizedException
-import com.mohiva.play.silhouette.api.services.{ AuthenticatorResult, AuthenticatorService, IdentityService }
+import com.mohiva.play.silhouette.api.services.{ AuthenticatorResult, AuthenticatorService }
 import net.codingwell.scalaguice.ScalaModule
 import org.specs2.control.NoLanguageFeatures
 import org.specs2.matcher.JsonMatchers

@@ -17,7 +17,6 @@ package com.mohiva.play.silhouette.persistence.repositories
 
 import com.google.inject.{ AbstractModule, Guice, Provides }
 import com.mohiva.play.silhouette.api.exceptions.ConfigurationException
-import com.mohiva.play.silhouette.api.repositories.AuthInfoRepository
 import com.mohiva.play.silhouette.api.util.PasswordInfo
 import com.mohiva.play.silhouette.api.{ AuthInfo, LoginInfo }
 import com.mohiva.play.silhouette.impl.providers.{ OAuth1Info, OAuth2Info }

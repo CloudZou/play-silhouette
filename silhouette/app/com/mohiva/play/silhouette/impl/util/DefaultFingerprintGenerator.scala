@@ -20,7 +20,6 @@
 package com.mohiva.play.silhouette.impl.util
 
 import com.mohiva.play.silhouette.api.crypto.Hash
-import com.mohiva.play.silhouette.api.util.FingerprintGenerator
 import play.api.http.HeaderNames._
 import play.api.mvc.RequestHeader
 

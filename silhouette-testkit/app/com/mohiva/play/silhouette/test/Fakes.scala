@@ -19,8 +19,7 @@ import java.util.UUID
 
 import com.mohiva.play.silhouette.api._
 import com.mohiva.play.silhouette.api.crypto.{ Base64AuthenticatorEncoder, Signer }
-import com.mohiva.play.silhouette.api.repositories.AuthenticatorRepository
-import com.mohiva.play.silhouette.api.services.{ AuthenticatorService, IdentityService }
+import com.mohiva.play.silhouette.api.services.AuthenticatorService
 import com.mohiva.play.silhouette.api.util.Clock
 import com.mohiva.play.silhouette.impl.authenticators._
 import com.mohiva.play.silhouette.impl.util.{ DefaultFingerprintGenerator, SecureRandomIDGenerator }

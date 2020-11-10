@@ -39,6 +39,21 @@ object Dependencies {
       val mock = "org.specs2" %% "specs2-mock" % version
     }
 
+    object Zio {
+      val zioVersion        = "1.0.1"
+      val zioLoggingVersion = "0.3.1"
+
+      lazy val zio             = "dev.zio"               %% "zio"                         % zioVersion
+      lazy val zioStream       = "dev.zio"               %% "zio-streams"                 % zioVersion
+      lazy val zioIntRS        = "dev.zio"               %% "zio-interop-reactivestreams" % "1.0.3.5-RC2"
+    }
+
+    object Tapir {
+      val tapirVersion = "0.17.0-M3"
+      lazy val tapir             = "com.softwaremill.sttp.tapir" %% "tapir-core"               % tapirVersion
+      lazy val tapirCirce        = "com.softwaremill.sttp.tapir" %% "tapir-json-circe"         % tapirVersion
+    }
+
     val jbcrypt = "de.svenkubiak" % "jBCrypt" % "0.4.1"
     val jwtCore = "com.atlassian.jwt" % "jwt-core" % "2.0.5"
     val jwtApi = "com.atlassian.jwt" % "jwt-api" % "2.0.5"

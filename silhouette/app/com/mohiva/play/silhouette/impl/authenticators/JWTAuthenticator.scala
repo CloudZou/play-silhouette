@@ -18,14 +18,14 @@ package com.mohiva.play.silhouette.impl.authenticators
 import com.atlassian.jwt.SigningAlgorithm
 import com.atlassian.jwt.core.writer.{JsonSmartJwtJsonBuilder, NimbusJwtWriterFactory}
 import com.mohiva.play.silhouette.api.Authenticator.Implicits._
-import com.mohiva.play.silhouette.api.crypto.AuthenticatorEncoder
+import com.mohiva.play.silhouette.api.crypto.{AuthenticatorEncoder, CryptoContext}
 import com.mohiva.play.silhouette.api.exceptions._
 import com.mohiva.play.silhouette.api.services.AuthenticatorService._
 import com.mohiva.play.silhouette.api.services.{AuthenticatorResult, AuthenticatorService}
 import com.mohiva.play.silhouette.api.util._
-import com.mohiva.play.silhouette.api.{ExpirableAuthenticator, Logger, LoginInfo, StorableAuthenticator}
+import com.mohiva.play.silhouette.api.{ExpirableAuthenticator, Logger, LoginInfo, StorableAuthenticator, auth}
 import com.mohiva.play.silhouette.impl.authenticators.JWTAuthenticator._
-import com.mohiva.play.silhouette.impl.authenticators.JWTAuthenticatorService._
+import com.mohiva.play.silhouette.impl.authenticators.JWTAuthenticatorService.{ReservedClaims, _}
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jwt.JWTClaimsSet
@@ -33,7 +33,13 @@ import org.joda.time.DateTime
 import play.api.libs.json._
 import play.api.mvc.{RequestHeader, Result}
 import com.mohiva.play.silhouette.ScalaCompat.JavaConverters._
+import com.mohiva.play.silhouette.api.crypto.AuthenticatorEncoder.AuthenticatorEncoder
 import com.mohiva.play.silhouette.api.repositories.Authenticator.AuthenticatorRepository
+import com.mohiva.play.silhouette.api.repositories.AuthenticatorRepository.AuthenticatorRepository
+import com.mohiva.play.silhouette.api.repositories.RepoContext
+import com.mohiva.play.silhouette.api.util.Generator.IDGenerator.IDGenerator
+import com.mohiva.play.silhouette.settings.ConfigurationProvider.ConfigurationProvider
+import zio.{Task, ZIO, ZLayer}
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -83,61 +89,55 @@ object JWTAuthenticator {
    * Serializes the authenticator.
    *
    * @param authenticator        The authenticator to serialize.
-   * @param authenticatorEncoder The authenticator encoder.
    * @param settings             The authenticator settings.
    * @return The serialized authenticator.
    */
   def serialize(
     authenticator: JWTAuthenticator,
-    authenticatorEncoder: AuthenticatorEncoder,
-    settings: JWTAuthenticatorSettings): String = {
+    settings: JWTAuthenticatorSettings): ZIO[AuthenticatorEncoder, Throwable, String] = {
 
-    val subject = Json.toJson(authenticator.loginInfo).toString()
-    val jwtBuilder = new JsonSmartJwtJsonBuilder()
-      .jwtId(authenticator.id)
-      .issuer(settings.issuerClaim)
-      .subject(authenticatorEncoder.encode(subject))
-      .issuedAt(authenticator.lastUsedDateTime.getMillis / 1000)
-      .expirationTime(authenticator.expirationDateTime.getMillis / 1000)
+    val internalSerialize = (encodedSubject: String) => Task.effect {
+      val jwtBuilder = new JsonSmartJwtJsonBuilder()
+        .jwtId(authenticator.id)
+        .issuer(settings.issuerClaim)
+        .subject(encodedSubject)
+        .issuedAt(authenticator.lastUsedDateTime.getMillis / 1000)
+        .expirationTime(authenticator.expirationDateTime.getMillis / 1000)
 
-    authenticator.customClaims.foreach { data =>
-      serializeCustomClaims(data).asScala.foreach {
-        case (key, value) =>
-          if (ReservedClaims.contains(key)) {
-            throw new AuthenticatorException(OverrideReservedClaim.format(ID, key, ReservedClaims.mkString(", ")))
-          }
-          jwtBuilder.claim(key, value)
+      authenticator.customClaims.foreach { data =>
+        serializeCustomClaims(data).asScala.foreach {
+          case (key, value) =>
+            if (ReservedClaims.contains(key)) {
+              throw new AuthenticatorException(OverrideReservedClaim.format(ID, key, ReservedClaims.mkString(", ")))
+            }
+            jwtBuilder.claim(key, value)
+        }
       }
+
+      new NimbusJwtWriterFactory()
+        .macSigningWriter(SigningAlgorithm.HS256, settings.sharedSecret)
+        .jsonToJwt(jwtBuilder.build())
     }
 
-    new NimbusJwtWriterFactory()
-      .macSigningWriter(SigningAlgorithm.HS256, settings.sharedSecret)
-      .jsonToJwt(jwtBuilder.build())
+    for {
+      subject <- zio.blocking.effectBlocking(Json.toJson(authenticator.loginInfo).toString())
+      encodedSubject <- ZIO.accessM[AuthenticatorEncoder](_.get.encode(subject))
+      jwtToken <- internalSerialize(encodedSubject)
+    } yield jwtToken
   }
 
   /**
    * Unserializes the authenticator.
    *
    * @param str                  The string representation of the authenticator.
-   * @param authenticatorEncoder The authenticator encoder.
    * @param settings             The authenticator settings.
    * @return An authenticator on success, otherwise a failure.
    */
   def unserialize(
     str: String,
-    authenticatorEncoder: AuthenticatorEncoder,
-    settings: JWTAuthenticatorSettings): Try[JWTAuthenticator] = {
+    settings: JWTAuthenticatorSettings): ZIO[AuthenticatorEncoder, Throwable, JWTAuthenticator] = {
 
-    Try {
-      val verifier = new MACVerifier(settings.sharedSecret)
-      val jwsObject = JWSObject.parse(str)
-      if (!jwsObject.verify(verifier)) {
-        throw new IllegalArgumentException("Fraudulent JWT token: " + str)
-      }
-
-      JWTClaimsSet.parse(jwsObject.getPayload.toJSONObject)
-    }.flatMap { c =>
-      val subject = authenticatorEncoder.decode(c.getSubject)
+    val internalUnSerialize = (subject: String, c: JWTClaimsSet) => Task.fromTry {
       buildLoginInfo(subject).map { loginInfo =>
         val filteredClaims = c.getClaims.asScala.filterNot { case (k, v) => ReservedClaims.contains(k) || v == null }
         val customClaims = unserializeCustomClaims(filteredClaims.asJava)
@@ -150,9 +150,25 @@ object JWTAuthenticator {
           customClaims = if (customClaims.keys.isEmpty) None else Some(customClaims)
         )
       }
-    }.recover {
+    } mapError {
       case e => throw new AuthenticatorException(InvalidJWTToken.format(ID, str), e)
     }
+
+    val parser = Task.effect {
+      val verifier = new MACVerifier(settings.sharedSecret)
+      val jwsObject = JWSObject.parse(str)
+      if (!jwsObject.verify(verifier)) {
+        throw new IllegalArgumentException("Fraudulent JWT token: " + str)
+      }
+
+      JWTClaimsSet.parse(jwsObject.getPayload.toJSONObject)
+    }
+
+    for {
+      jwtClaimSet <- parser
+      subject <- ZIO.accessM[AuthenticatorEncoder](_.get.decode(jwtClaimSet.getSubject))
+      authenticator <- internalUnSerialize(subject, jwtClaimSet)
+    } yield authenticator
   }
 
   /**
@@ -215,25 +231,150 @@ object JWTAuthenticator {
   }
 }
 
-/**
- * The service that handles the JWT authenticator.
- *
- * If the authenticator DAO is deactivated then a stateless approach will be used. But note
- * that you will loose the possibility to invalidate a JWT.
- *
- * @param settings             The authenticator settings.
- * @param repository           The repository to persist the authenticator. Set it to None to use a stateless approach.
- * @param authenticatorEncoder The authenticator encoder.
- * @param idGenerator          The ID generator used to create the authenticator ID.
- * @param clock                The clock implementation.
- * @param executionContext     The execution context to handle the asynchronous operations.
- */
+object JWTAuthenticatorService {
+  val live: ZLayer[RepoContext, Throwable, AuthenticatorService[_]] = ZLayer.fromServices {
+    (authenticatorEncoder: AuthenticatorEncoder, configurationProvider: ConfigurationProvider, idGenerator: IDGenerator, authenticatorRepository: AuthenticatorRepository[JWTAuthenticator]) =>
+      new AuthenticatorService[JWTAuthenticator] {
+        private val settings = configurationProvider.get.underlying.asInstanceOf[JWTAuthenticatorSettings]
+        /**
+         * Creates a new authenticator for the specified login info.
+         *
+         * @param loginInfo The login info for which the authenticator should be created.
+         * @return An authenticator.
+         */
+        override def create(loginInfo: LoginInfo): Task[JWTAuthenticator] = {
+          val jwtAuthenticator = (id: String) => Task.effect {
+            val now = DateTime.now
+            JWTAuthenticator(
+              id = id,
+              loginInfo = loginInfo,
+              lastUsedDateTime = now,
+              expirationDateTime = now + settings.authenticatorExpiry,
+              idleTimeout = settings.authenticatorIdleTimeout
+            )
+          } mapError{
+            e => throw new AuthenticatorCreationException(CreateError.format(ID, loginInfo), e)
+          }
+          for {
+            id <- idGenerator.get.generate
+            authenticator <- jwtAuthenticator(id)
+          } yield authenticator
+        }
+
+        /**
+         * Retrieves the authenticator from request.
+         *
+         * @tparam B The type of the request body.
+         * @return Some authenticator or None if no authenticator could be found in request.
+         */
+        override def retrieve[B](token: String): Task[JWTAuthenticator] = unserialize(token, settings).provide(authenticatorEncoder)
+
+        /**
+         * Initializes an authenticator and instead of embedding into the the request or result, it returns
+         * the serialized value.
+         *
+         * @param authenticator The authenticator instance.
+         * @return The serialized authenticator value.
+         */
+        override def init(authenticator: JWTAuthenticator): Task[String] = {
+          authenticatorRepository.get.add(authenticator).flatMap(_ => serialize(authenticator, settings)).provide(authenticatorEncoder)
+        }
+
+        /**
+         * Embeds authenticator specific artifacts into the response.
+         *
+         * @param value  The authenticator value to embed.
+         * @param result The result to manipulate.
+         * @return The manipulated result.
+         */
+        override def embed(value: String, result: auth.Result): Task[AuthenticatorResult] = ???
+
+        /**
+         * Touches an authenticator.
+         *
+         * An authenticator can use sliding window expiration. This means that the authenticator times
+         * out after a certain time if it wasn't used. So to mark an authenticator as used it will be
+         * touched on every request to a Silhouette action. If an authenticator should not be touched
+         * because of the fact that sliding window expiration is disabled, then it should be returned
+         * on the right, otherwise it should be returned on the left. An untouched authenticator needn't
+         * be updated later by the [[update]] method.
+         *
+         * @param authenticator The authenticator to touch.
+         * @return The touched authenticator on the left or the untouched authenticator on the right.
+         */
+        override def touch(authenticator: JWTAuthenticator): Either[JWTAuthenticator, JWTAuthenticator] = ???
+
+        /**
+         * Updates a touched authenticator.
+         *
+         * If the authenticator was updated, then the updated artifacts should be embedded into the response.
+         * This method gets called on every subsequent request if an identity accesses a Silhouette action,
+         * expect the authenticator was not touched.
+         *
+         * @param authenticator The authenticator to update.
+         * @param result        The result to manipulate.
+         * @return The original or a manipulated result.
+         */
+        override def update(authenticator: JWTAuthenticator, result: auth.Result): Task[AuthenticatorResult] = ???
+
+        /**
+         * Renews the expiration of an authenticator without embedding it into the result.
+         *
+         * Based on the implementation, the renew method should revoke the given authenticator first, before
+         * creating a new one. If the authenticator was updated, then the updated artifacts should be returned.
+         *
+         * @param authenticator The authenticator to renew.
+         * @return The serialized expression of the authenticator.
+         */
+        override def renew(authenticator: JWTAuthenticator): Task[String] = ???
+
+        /**
+         * Renews the expiration of an authenticator.
+         *
+         * Based on the implementation, the renew method should revoke the given authenticator first, before
+         * creating a new one. If the authenticator was updated, then the updated artifacts should be embedded
+         * into the response.
+         *
+         * @param authenticator The authenticator to renew.
+         * @param result        The result to manipulate.
+         * @return The original or a manipulated result.
+         */
+        override def renew(authenticator: JWTAuthenticator, result: auth.Result): Task[AuthenticatorResult] = ???
+
+        /**
+         * Manipulates the response and removes authenticator specific artifacts before sending it to the client.
+         *
+         * @param authenticator The authenticator instance.
+         * @param result        The result to manipulate.
+         * @return The manipulated result.
+         */
+        override def discard(authenticator: JWTAuthenticator, result: auth.Result): Task[AuthenticatorResult] = ???
+      }
+
+  }
+
+
+  /**
+   * The ID of the authenticator.
+   */
+  val ID = "jwt-authenticator"
+
+  /**
+   * The error messages.
+   */
+  val InvalidJWTToken = "[Silhouette][%s] Error on parsing JWT token: %s"
+  val JsonParseError = "[Silhouette][%s] Cannot parse Json: %s"
+  val UnexpectedJsonValue = "[Silhouette][%s] Unexpected Json value: %s"
+  val OverrideReservedClaim = "[Silhouette][%s] Try to overriding a reserved claim `%s`; list of reserved claims: %s"
+
+  /**
+   * The reserved claims used by the authenticator.
+   */
+  val ReservedClaims = Seq("jti", "iss", "sub", "iat", "exp")
+}
 class JWTAuthenticatorService(
   settings: JWTAuthenticatorSettings,
-  repository: Option[AuthenticatorRepository[JWTAuthenticator]],
-  authenticatorEncoder: AuthenticatorEncoder,
-  idGenerator: IDGenerator,
-  clock: Clock)(implicit val executionContext: ExecutionContext)
+  authenticatorEncoder: AuthenticatorEncoder)
   extends AuthenticatorService[JWTAuthenticator]
   with Logger {
 

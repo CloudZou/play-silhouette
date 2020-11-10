@@ -21,9 +21,8 @@ import com.mohiva.play.silhouette.api.Authenticator.Implicits._
 import com.mohiva.play.silhouette.api.LoginInfo
 import com.mohiva.play.silhouette.api.crypto.{ Base64AuthenticatorEncoder, Signer }
 import com.mohiva.play.silhouette.api.exceptions._
-import com.mohiva.play.silhouette.api.repositories.AuthenticatorRepository
 import com.mohiva.play.silhouette.api.services.AuthenticatorService._
-import com.mohiva.play.silhouette.api.util.{ Clock, FingerprintGenerator, IDGenerator }
+import com.mohiva.play.silhouette.api.util.{ Clock, IDGenerator }
 import com.mohiva.play.silhouette.impl.authenticators.CookieAuthenticator._
 import com.mohiva.play.silhouette.impl.authenticators.CookieAuthenticatorService._
 import org.joda.time.DateTime

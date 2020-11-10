@@ -16,10 +16,12 @@
 package com.mohiva.play.silhouette.persistence.repositories
 
 import javax.inject.Inject
-
-import com.mohiva.play.silhouette.api.StorableAuthenticator
-import com.mohiva.play.silhouette.api.repositories.AuthenticatorRepository
-import com.mohiva.play.silhouette.api.util.CacheLayer
+import com.mohiva.play.silhouette.api.{Authenticator, StorableAuthenticator}
+import com.mohiva.play.silhouette.api.repositories.Authenticator.AuthenticatorRepository
+import com.mohiva.play.silhouette.api.repositories.AuthenticatorRepository.AuthenticatorRepository
+import com.mohiva.play.silhouette.api.util.CacheClient
+import com.mohiva.play.silhouette.api.util.CacheClient.CacheService
+import zio.ZLayer
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
@@ -31,6 +33,8 @@ import scala.reflect.ClassTag
  * @param cacheLayer The cache layer implementation.
  * @tparam T The type of the authenticator to store.
  */
+
+
 class CacheAuthenticatorRepository[T <: StorableAuthenticator: ClassTag] @Inject() (cacheLayer: CacheLayer)
   extends AuthenticatorRepository[T] {
 
@@ -40,7 +44,7 @@ class CacheAuthenticatorRepository[T <: StorableAuthenticator: ClassTag] @Inject
    * @param id The authenticator ID.
    * @return The found authenticator or None if no authenticator could be found for the given ID.
    */
-  override def find(id: String): Future[Option[T]] = cacheLayer.find[T](id)
+  override def find(id: String): Task[Option[T]] = cacheLayer.find[T](id)
 
   /**
    * Adds a new authenticator.

@@ -1,10 +1,15 @@
 import Dependencies._
 
 libraryDependencies ++= Seq(
-  Library.Play.cache,
-  Library.Play.ws,
-  Library.Play.openid,
-  Library.Play.jsonJoda,
+//  Library.Play.cache,
+//  Library.Play.ws,
+//  Library.Play.openid,
+//  Library.Play.jsonJoda,
+  Library.Zio.zio,
+  Library.Tapir.tapir,
+  Library.Tapir.tapirCirce,
+  Library.Zio.zioStream,
+  Library.Zio.zioIntRS,
   Library.jwtCore,
   Library.jwtApi,
   Library.apacheCommonLang,

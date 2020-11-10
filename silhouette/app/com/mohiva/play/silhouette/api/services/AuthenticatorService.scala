@@ -21,7 +21,7 @@ package com.mohiva.play.silhouette.api.services
 
 import com.mohiva.play.silhouette.api.auth.Result
 import com.mohiva.play.silhouette.api.{Authenticator, LoginInfo}
-import zio.Task
+import zio.{Has, Task}
 
 /**
  * A marker result which indicates that an operation on an authenticator was processed and
@@ -58,6 +58,20 @@ object AuthenticatorResult {
   def apply(result: Result) = new AuthenticatorResult(result)
 }
 
+object AuthenticatorService {
+  type AuthenticatorService[T <: Authenticator] = Has[AuthenticatorService[T]]
+
+  /**
+   * The error messages.
+   */
+  val CreateError = "[Silhouette][%s] Could not create authenticator for login info: %s"
+  val RetrieveError = "[Silhouette][%s] Could not retrieve authenticator"
+  val InitError = "[Silhouette][%s] Could not init authenticator: %s"
+  val UpdateError = "[Silhouette][%s] Could not update authenticator: %s"
+  val RenewError = "[Silhouette][%s] Could not renew authenticator: %s"
+  val DiscardError = "[Silhouette][%s] Could not discard authenticator: %s"
+}
+
 /**
  * Handles authenticators for the Silhouette module.
  *
@@ -79,7 +93,7 @@ trait AuthenticatorService[T <: Authenticator] {
    * @tparam B The type of the request body.
    * @return Some authenticator or None if no authenticator could be found in request.
    */
-  def retrieve[B]: Task[Option[T]]
+  def retrieve[B](token: String): Task[T]
 
   /**
    * Initializes an authenticator and instead of embedding into the the request or result, it returns
@@ -98,22 +112,6 @@ trait AuthenticatorService[T <: Authenticator] {
    * @return The manipulated result.
    */
   def embed(value: T#Value, result: Result): Task[AuthenticatorResult]
-
-  /**
-   * Embeds authenticator specific artifacts into the request.
-   *
-   * This method can be used to embed an authenticator in a existing request. This can be useful
-   * in Play filters. So before executing a SecuredAction we can embed the authenticator in
-   * the request to lead the action to believe that the request is a new request which contains
-   * a valid authenticator.
-   *
-   * If an existing authenticator exists, then it will be overridden.
-   *
-   * @param value The authenticator value to embed.
-   * @param request The request header.
-   * @return The manipulated request header.
-   */
-  def embed(value: T#Value, request: RequestHeader): RequestHeader
 
   /**
    * Touches an authenticator.
@@ -177,18 +175,3 @@ trait AuthenticatorService[T <: Authenticator] {
   def discard(authenticator: T, result: Result): Task[AuthenticatorResult]
 }
 
-/**
- * The companion object.
- */
-object AuthenticatorService {
-
-  /**
-   * The error messages.
-   */
-  val CreateError = "[Silhouette][%s] Could not create authenticator for login info: %s"
-  val RetrieveError = "[Silhouette][%s] Could not retrieve authenticator"
-  val InitError = "[Silhouette][%s] Could not init authenticator: %s"
-  val UpdateError = "[Silhouette][%s] Could not update authenticator: %s"
-  val RenewError = "[Silhouette][%s] Could not renew authenticator: %s"
-  val DiscardError = "[Silhouette][%s] Could not discard authenticator: %s"
-}

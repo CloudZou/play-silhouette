@@ -15,7 +15,15 @@
  */
 package com.mohiva.play.silhouette.api
 
+import com.mohiva.play.silhouette.api.util.Cache.CacheService
+import com.mohiva.play.silhouette.api.util.Generator.FingerprintGenerator.FingerprintGenerator
+import com.mohiva.play.silhouette.api.util.Generator.IDGenerator.IDGenerator
+import zio.blocking.Blocking
+
 /**
  * Provides utilities used by the API.
  */
-package object util {}
+package object util {
+  val live = Cache.live ++ Generator.live
+  type UtilContext = zio.clock.Clock with Blocking with CacheService with FingerprintGenerator with IDGenerator
+}

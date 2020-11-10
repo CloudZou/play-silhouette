@@ -15,44 +15,69 @@
  */
 package com.mohiva.play.silhouette.api.crypto
 
+import com.mohiva.play.silhouette.api.crypto.Crypter.Crypter
 import javax.inject.Inject
+import zio.{Has, Layer, Task, ZIO, ZLayer}
 
-/**
- * Specifies encoding/decoding of authenticator data.
- */
-trait AuthenticatorEncoder {
 
-  /**
-   * Encodes a string.
-   *
-   * @param data The data to encode.
-   * @return The encoded data.
-   */
-  def encode(data: String): String
+object AuthenticatorEncoder {
+  type AuthenticatorEncoder = Has[Service]
+  trait Service {
+    /**
+     * Encodes a string.
+     *
+     * @param data The data to encode.
+     * @return The encoded data.
+     */
+    def encode(data: String): Task[String]
 
-  /**
-   * Decodes a string.
-   *
-   * @param data The data to decode.
-   * @return The decoded data.
-   */
-  def decode(data: String): String
-}
+    /**
+     * Decodes a string.
+     *
+     * @param data The data to decode.
+     * @return The decoded data.
+     */
+    def decode(data: String): Task[String]
+  }
 
-/**
- * Authenticator encoder implementation based on Base64.
- */
-class Base64AuthenticatorEncoder extends AuthenticatorEncoder {
-  override def encode(data: String): String = Base64.encode(data)
-  override def decode(data: String): String = Base64.decode(data)
-}
+  val base64: Layer[Nothing, Has[Service]] = ZLayer.succeed {
+    new Service {
+      /**
+       * Encodes a string.
+       *
+       * @param data The data to encode.
+       * @return The encoded data.
+       */
+      override def encode(data: String): Task[String] = Task.effect(Base64.encode(data))
 
-/**
- * Authenticator encoder implementation based on the [[Crypter]].
- *
- * @param crypter The crypter instance to use for the encoder.
- */
-class CrypterAuthenticatorEncoder @Inject() (crypter: Crypter) extends AuthenticatorEncoder {
-  override def encode(data: String): String = crypter.encrypt(data)
-  override def decode(data: String): String = crypter.decrypt(data)
+      /**
+       * Decodes a string.
+       *
+       * @param data The data to decode.
+       * @return The decoded data.
+       */
+      override def decode(data: String): Task[String] = Task.effect(Base64.decode(data))
+    }
+  }
+
+  val crypter: ZLayer[Crypter, Nothing, Has[Service]] = ZLayer.fromService { (crypter: Crypter.Service) =>
+    new Service {
+      val key = ???
+      /**
+       * Encodes a string.
+       *
+       * @param data The data to encode.
+       * @return The encoded data.
+       */
+      override def encode(data: String): Task[String] = crypter.encrypt(key, data)
+
+      /**
+       * Decodes a string.
+       *
+       * @param data The data to decode.
+       * @return The decoded data.
+       */
+      override def decode(data: String): Task[String] = crypter.decrypt(key, data)
+    }
+  }
 }

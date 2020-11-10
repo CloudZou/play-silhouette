@@ -15,7 +15,13 @@
  */
 package com.mohiva.play.silhouette.api
 
+import com.mohiva.play.silhouette.api.repositories.AuthInfo.AuthInfoRepository
+import com.mohiva.play.silhouette.api.repositories.AuthenticatorRepository.AuthenticatorRepository
+
 /**
  * Provides repositories used by the API to persist entities.
  */
-package object repositories {}
+package object repositories {
+  type RepoContext =  AuthenticatorRepository with AuthInfoRepository[_]
+  val live = AuthenticatorRepository.live ++ AuthenticatorRepository.live
+}

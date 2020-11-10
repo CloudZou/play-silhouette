@@ -20,7 +20,7 @@ import com.mohiva.play.silhouette.api.crypto.AuthenticatorEncoder
 import com.mohiva.play.silhouette.api.exceptions._
 import com.mohiva.play.silhouette.api.services.AuthenticatorService._
 import com.mohiva.play.silhouette.api.services.{ AuthenticatorResult, AuthenticatorService }
-import com.mohiva.play.silhouette.api.util.{ Clock, ExtractableRequest, FingerprintGenerator }
+import com.mohiva.play.silhouette.api.util.{ Clock, ExtractableRequest }
 import com.mohiva.play.silhouette.api.{ Authenticator, ExpirableAuthenticator, Logger, LoginInfo }
 import com.mohiva.play.silhouette.impl.authenticators.SessionAuthenticatorService._
 import org.joda.time.DateTime

@@ -21,7 +21,6 @@ import com.mohiva.play.silhouette.api.Authenticator.Implicits._
 import com.mohiva.play.silhouette.api.LoginInfo
 import com.mohiva.play.silhouette.api.crypto.{ Base64, Base64AuthenticatorEncoder }
 import com.mohiva.play.silhouette.api.exceptions._
-import com.mohiva.play.silhouette.api.repositories.AuthenticatorRepository
 import com.mohiva.play.silhouette.api.services.AuthenticatorService._
 import com.mohiva.play.silhouette.api.util.{ Clock, IDGenerator, RequestPart }
 import com.mohiva.play.silhouette.impl.authenticators.JWTAuthenticator._

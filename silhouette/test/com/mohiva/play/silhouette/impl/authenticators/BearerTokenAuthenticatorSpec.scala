@@ -18,7 +18,6 @@ package com.mohiva.play.silhouette.impl.authenticators
 import com.mohiva.play.silhouette.api.Authenticator.Implicits._
 import com.mohiva.play.silhouette.api.LoginInfo
 import com.mohiva.play.silhouette.api.exceptions._
-import com.mohiva.play.silhouette.api.repositories.AuthenticatorRepository
 import com.mohiva.play.silhouette.api.services.AuthenticatorService._
 import com.mohiva.play.silhouette.api.util.{ RequestPart, Clock, IDGenerator }
 import com.mohiva.play.silhouette.impl.authenticators.BearerTokenAuthenticatorService._
