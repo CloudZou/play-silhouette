@@ -302,7 +302,13 @@ object JWTAuthenticatorService {
          * @param authenticator The authenticator to touch.
          * @return The touched authenticator on the left or the untouched authenticator on the right.
          */
-        override def touch(authenticator: JWTAuthenticator): Either[JWTAuthenticator, JWTAuthenticator] = ???
+        override def touch(authenticator: JWTAuthenticator): Task[Either[JWTAuthenticator, JWTAuthenticator]] = Task.effect {
+          if (authenticator.idleTimeout.isDefined) {
+            Left(authenticator.copy(lastUsedDateTime = DateTime.now))
+          } else {
+            Right(authenticator)
+          }
+        }
 
         /**
          * Updates a touched authenticator.

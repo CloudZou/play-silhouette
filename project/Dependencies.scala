@@ -46,6 +46,7 @@ object Dependencies {
       lazy val zio             = "dev.zio"               %% "zio"                         % zioVersion
       lazy val zioStream       = "dev.zio"               %% "zio-streams"                 % zioVersion
       lazy val zioIntRS        = "dev.zio"               %% "zio-interop-reactivestreams" % "1.0.3.5-RC2"
+      lazy val circeGeneric = "io.circe"     %% "circe-generic" % "0.12.1"
     }
 
     object Tapir {

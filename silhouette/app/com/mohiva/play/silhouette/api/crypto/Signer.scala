@@ -24,7 +24,7 @@ import zio.{Has, Layer, Task, ZLayer}
 import scala.util.{Failure, Success, Try}
 
 object Signer {
-  type Signer = Has[Signer]
+  type Signer = Has[Service]
 
   trait Service {
     def sign(data: String): Task[String]

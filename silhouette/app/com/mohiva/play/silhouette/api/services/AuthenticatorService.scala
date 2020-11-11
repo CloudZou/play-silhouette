@@ -126,7 +126,7 @@ trait AuthenticatorService[T <: Authenticator] {
    * @param authenticator The authenticator to touch.
    * @return The touched authenticator on the left or the untouched authenticator on the right.
    */
-  def touch(authenticator: T): Either[T, T]
+  def touch(authenticator: T): Task[Either[T, T]]
 
   /**
    * Updates a touched authenticator.

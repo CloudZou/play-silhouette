@@ -10,6 +10,7 @@ libraryDependencies ++= Seq(
   Library.Tapir.tapirCirce,
   Library.Zio.zioStream,
   Library.Zio.zioIntRS,
+  Library.Zio.circeGeneric,
   Library.jwtCore,
   Library.jwtApi,
   Library.apacheCommonLang,

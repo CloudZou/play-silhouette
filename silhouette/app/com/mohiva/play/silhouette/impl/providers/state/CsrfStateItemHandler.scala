@@ -16,20 +16,20 @@
 package com.mohiva.play.silhouette.impl.providers.state
 
 import javax.inject.Inject
-
 import com.mohiva.play.silhouette.api.Logger
 import com.mohiva.play.silhouette.api.crypto.Signer
-import com.mohiva.play.silhouette.api.util.{ ExtractableRequest, IDGenerator }
 import com.mohiva.play.silhouette.impl.exceptions.OAuth2StateException
 import com.mohiva.play.silhouette.impl.providers.SocialStateItem.ItemStructure
 import com.mohiva.play.silhouette.impl.providers.state.CsrfStateItemHandler._
-import com.mohiva.play.silhouette.impl.providers.{ PublishableSocialStateItemHandler, SocialStateItem, SocialStateItemHandler }
-import play.api.libs.json.{ Format, Json }
-import play.api.mvc.{ Cookie, RequestHeader, Result }
+import com.mohiva.play.silhouette.impl.providers.{PublishableSocialStateItemHandler, SocialStateItem, SocialStateItemHandler}
+import io.circe.{Decoder, Encoder}
+import io.circe
+import play.api.libs.json.{Format, Json}
+import play.api.mvc.{Cookie, RequestHeader, Result}
 
 import scala.concurrent.duration._
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.{ Failure, Success, Try }
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 /**
  * The item the handler can handle.
@@ -46,7 +46,8 @@ object CsrfStateItem {
   /**
    * Converts the [[CsrfStateItem]] to JSON and vice versa.
    */
-  implicit val csrfFormat: Format[CsrfStateItem] = Json.format[CsrfStateItem]
+  implicit def passwordInfoEncoder: Encoder[CsrfStateItem] = deriveEncoder[CsrfStateItem]
+  implicit val passwordInfoDecoder: Decoder[CsrfStateItem] = deriveDecoder[CsrfStateItem]
 }
 
 /**
@@ -101,11 +102,10 @@ class CsrfStateItemHandler @Inject() (
    * serialized state item.
    *
    * @param item    The item to check for.
-   * @param request The request instance to get additional data to validate against.
    * @tparam B The type of the request body.
    * @return True if the handler can handle the given state item, false otherwise.
    */
-  override def canHandle[B](item: ItemStructure)(implicit request: ExtractableRequest[B]): Boolean = {
+  override def canHandle[B](item: ItemStructure): Boolean = {
     item.id == ID && {
       clientState match {
         case Success(i) => i == item.data.as[Item]
@@ -169,12 +169,7 @@ class CsrfStateItemHandler @Inject() (
    * @param request The request header.
    * @return The CSRF token on success, otherwise a failure.
    */
-  private def clientState(implicit request: RequestHeader): Try[Item] = {
-    request.cookies.get(settings.cookieName) match {
-      case Some(cookie) => signer.extract(cookie.value).map(token => CsrfStateItem(token))
-      case None         => Failure(new OAuth2StateException(ClientStateDoesNotExists.format(settings.cookieName)))
-    }
-  }
+  private def clientState(stateValue: String): Try[Item] = signer.extract(stateValue).map(token => CsrfStateItem(token))
 }
 
 /**

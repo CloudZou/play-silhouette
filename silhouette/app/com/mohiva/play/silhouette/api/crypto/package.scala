@@ -8,5 +8,5 @@ import zio.blocking.Blocking
 package object crypto {
   val live = AuthenticatorEncoder.crypter ++ AuthenticatorEncoder.base64 ++ Crypter.live ++ Signer.live
 
-  type CryptoContext = Blocking with AuthenticatorEncoder with Crypter with Signer
+  type CryptoContext = AuthenticatorEncoder with Crypter with Signer
 }

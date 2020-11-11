@@ -16,15 +16,21 @@
 package com.mohiva.play.silhouette.impl.providers
 
 import com.mohiva.play.silhouette.api.AuthInfo
-import com.mohiva.play.silhouette.api.crypto.{ Base64, Signer }
+import com.mohiva.play.silhouette.api.crypto.Signer.Signer
+import com.mohiva.play.silhouette.api.crypto.{Base64, CryptoContext, Signer}
 import com.mohiva.play.silhouette.api.exceptions.ProviderException
 import com.mohiva.play.silhouette.api.util.ExtractableRequest
+import com.mohiva.play.silhouette.api.util.Generator.IDGenerator
+import com.mohiva.play.silhouette.api.util.Generator.IDGenerator.IDGenerator
 import com.mohiva.play.silhouette.impl.providers.DefaultSocialStateHandler._
 import com.mohiva.play.silhouette.impl.providers.SocialStateItem._
-import play.api.libs.json.{ Format, JsValue, Json }
+import com.mohiva.play.silhouette.impl.providers.state.CsrfStateItem
+import io.circe.{Decoder, Encoder, Json}
+import io.circe.syntax.EncoderOps
 import play.api.mvc.Result
+import zio.{Has, Task, ZLayer}
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
 /**
@@ -66,21 +72,21 @@ object SocialStateItem {
    * @param id   A unique identifier for the state item.
    * @param data The state item data as JSON value.
    */
-  case class ItemStructure(id: String, data: JsValue) {
+  case class ItemStructure(id: String, data: Json) {
 
     /**
      * Returns the serialized representation of the item.
      *
      * @return The serialized representation of the item.
      */
-    def asString = s"${Base64.encode(id)}-${Base64.encode(data)}"
+    def asString = s"${Base64.encode(id)}-${Base64.encode(data.noSpaces)}"
   }
 
   /**
    * The companion object of the [[ItemStructure]].
    */
   object ItemStructure {
-
+    import io.circe.parser._
     /**
      * An extractor which unserializes a state item from a string.
      *
@@ -90,7 +96,10 @@ object SocialStateItem {
     def unapply(str: String): Option[ItemStructure] = {
       str.split('-').toList match {
         case List(id, data) =>
-          Some(ItemStructure(Base64.decode(id), Json.parse(Base64.decode(data))))
+          parse(Base64.decode(data)) match {
+            case Left(_) => None
+            case Right(json) => Some(ItemStructure(Base64.decode(id), json))
+          }
         case _ => None
       }
     }
@@ -268,6 +277,7 @@ class DefaultSocialStateHandler(val handlers: Set[SocialStateItemHandler], signe
    * @param state   The state to unserialize.
    * @param request The request to read the value of the state param from.
    * @param ec      The execution context to handle the asynchronous operations.
+   *
    * @tparam B The type of the request body.
    * @return The social state on success, an error on failure.
    */
@@ -329,89 +339,90 @@ object DefaultSocialStateHandler {
   val ItemExtractionError = "Cannot extract social state item from string: %s"
 }
 
-/**
- * Handles state for different purposes.
- */
-trait SocialStateItemHandler {
-
-  /**
-   * The item the handler can handle.
-   */
-  type Item <: SocialStateItem
-
-  /**
-   * Gets the state item the handler can handle.
-   *
-   * @param ec The execution context to handle the asynchronous operations.
-   * @return The state params the handler can handle.
-   */
-  def item(implicit ec: ExecutionContext): Future[Item]
-
-  /**
-   * Indicates if a handler can handle the given [[SocialStateItem]].
-   *
-   * This method should check if the [[serialize]] method of this handler can serialize the given
-   * unserialized state item.
-   *
-   * @param item The item to check for.
-   * @return `Some[Item]` casted state item if the handler can handle the given state item, `None` otherwise.
-   */
-  def canHandle(item: SocialStateItem): Option[Item]
-
-  /**
-   * Indicates if a handler can handle the given unserialized state item.
-   *
-   * This method should check if the [[unserialize]] method of this handler can unserialize the given
-   * serialized state item.
-   *
-   * @param item    The item to check for.
-   * @param request The request instance to get additional data to validate against.
-   * @tparam B The type of the request body.
-   * @return True if the handler can handle the given state item, false otherwise.
-   */
-  def canHandle[B](item: ItemStructure)(implicit request: ExtractableRequest[B]): Boolean
-
-  /**
-   * Returns a serialized value of the state item.
-   *
-   * @param item The state item to serialize.
-   * @return The serialized state item.
-   */
-  def serialize(item: Item): ItemStructure
-
-  /**
-   * Unserializes the state item.
-   *
-   * @param item    The state item to unserialize.
-   * @param request The request instance to get additional data to validate against.
-   * @param ec      The execution context to handle the asynchronous operations.
-   * @tparam B The type of the request body.
-   * @return The unserialized state item.
-   */
-  def unserialize[B](item: ItemStructure)(
-    implicit
-    request: ExtractableRequest[B],
-    ec: ExecutionContext
-  ): Future[Item]
-}
-
-/**
- * A state item handler which can publish its internal state to the client.
- *
- * Some state item handlers, like the CSRF state handler, needs the ability to publish state to a cookie.
- * So if you have such a state item handler, then mixin this trait, to publish the state item to the client.
- */
-trait PublishableSocialStateItemHandler {
-  self: SocialStateItemHandler =>
-
-  /**
-   * Publishes the state to the client.
-   *
-   * @param item    The item to publish.
-   * @param result  The result to send to the client.
-   * @param request The current request.
-   * @tparam B The type of the request body.
-   * @return The result to send to the client.
-   */
-  def publish[B](item: Item, result: Result)(implicit request: ExtractableRequest[B]): Result
-}
+//
+///**
+// * Handles state for different purposes.
+// */
+//trait  SocialStateItemHandler {
+//
+//  /**
+//   * The item the handler can handle.
+//   */
+//  type Item <: SocialStateItem
+//
+//  /**
+//   * Gets the state item the handler can handle.
+//   *
+//   * @param ec The execution context to handle the asynchronous operations.
+//   * @return The state params the handler can handle.
+//   */
+//  def item(implicit ec: ExecutionContext): Future[Item]
+//
+//  /**
+//   * Indicates if a handler can handle the given [[SocialStateItem]].
+//   *
+//   * This method should check if the [[serialize]] method of this handler can serialize the given
+//   * unserialized state item.
+//   *
+//   * @param item The item to check for.
+//   * @return `Some[Item]` casted state item if the handler can handle the given state item, `None` otherwise.
+//   */
+//  def canHandle(item: SocialStateItem): Option[Item]
+//
+//  /**
+//   * Indicates if a handler can handle the given unserialized state item.
+//   *
+//   * This method should check if the [[unserialize]] method of this handler can unserialize the given
+//   * serialized state item.
+//   *
+//   * @param item    The item to check for.
+//   * @param request The request instance to get additional data to validate against.
+//   * @tparam B The type of the request body.
+//   * @return True if the handler can handle the given state item, false otherwise.
+//   */
+//  def canHandle[B](item: ItemStructure)(implicit request: ExtractableRequest[B]): Boolean
+//
+//  /**
+//   * Returns a serialized value of the state item.
+//   *
+//   * @param item The state item to serialize.
+//   * @return The serialized state item.
+//   */
+//  def serialize(item: Item): ItemStructure
+//
+//  /**
+//   * Unserializes the state item.
+//   *
+//   * @param item    The state item to unserialize.
+//   * @param request The request instance to get additional data to validate against.
+//   * @param ec      The execution context to handle the asynchronous operations.
+//   * @tparam B The type of the request body.
+//   * @return The unserialized state item.
+//   */
+//  def unserialize[B](item: ItemStructure)(
+//    implicit
+//    request: ExtractableRequest[B],
+//    ec: ExecutionContext
+//  ): Future[Item]
+//}
+//
+///**
+// * A state item handler which can publish its internal state to the client.
+// *
+// * Some state item handlers, like the CSRF state handler, needs the ability to publish state to a cookie.
+// * So if you have such a state item handler, then mixin this trait, to publish the state item to the client.
+// */
+//trait PublishableSocialStateItemHandler {
+//  self: SocialStateItemHandler =>
+//
+//  /**
+//   * Publishes the state to the client.
+//   *
+//   * @param item    The item to publish.
+//   * @param result  The result to send to the client.
+//   * @param request The current request.
+//   * @tparam B The type of the request body.
+//   * @return The result to send to the client.
+//   */
+//  def publish[B](item: Item, result: Result)(implicit request: ExtractableRequest[B]): Result
+//}
